@@ -59,6 +59,7 @@ DROP TABLE IF EXISTS user_activity CASCADE;
 DROP TABLE IF EXISTS dataset_user_likes CASCADE;
 DROP TABLE IF EXISTS dataset_view_count CASCADE;
 DROP TABLE IF EXISTS site_settings CASCADE;
+DROP TABLE IF EXISTS workflow_sql CASCADE;
 
 -- ============================================
 -- 4. Create PostgreSQL enum types
@@ -110,6 +111,16 @@ CREATE TABLE IF NOT EXISTS workflow
     creation_time      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_modified_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_public          BOOLEAN NOT NULL DEFAULT false
+    );
+
+-- workflow_sql (stores latest SQL for each workflow)
+CREATE TABLE IF NOT EXISTS workflow_sql
+(
+    wid INT PRIMARY KEY,
+    sql_text TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wid) REFERENCES workflow(wid) ON DELETE CASCADE
     );
 
 -- workflow_of_user
