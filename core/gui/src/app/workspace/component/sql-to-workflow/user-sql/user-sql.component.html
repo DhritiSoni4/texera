@@ -1,0 +1,127 @@
+<div class="container">
+  <h4>CSV Tables</h4>
+
+  <!-- No tables message -->
+  <div *ngIf="tableBindings.length === 0" class="text-muted mb-3">
+    No tables bound yet. Click <strong>Add Table</strong> to register a CSV.
+  </div>
+
+  <!-- Table bindings -->
+  <div
+    *ngFor="let row of tableBindings; let i = index"
+    class="table-binding-card d-flex align-items-center flex-wrap"
+  >
+    <!-- Table Name -->
+    <div class="form-group mr-3 mb-2" style="flex: 1 1 220px;">
+      <label class="form-label">Table name</label>
+      <input
+        class="form-control"
+        [(ngModel)]="row.name"
+        placeholder="e.g. users, cities, orders"
+      />
+      <div *ngIf="!row.name" class="text-danger small">Required field</div>
+      <div *ngIf="row.name && !isValidIdentifier(row.name)" class="text-danger small">
+        Must start with a letter or underscore; only letters, numbers, underscores allowed.
+      </div>
+    </div>
+
+    <!-- CSV File Picker -->
+    <div class="form-group mr-3 mb-2" style="flex: 1 1 260px;">
+      <label class="form-label">CSV file</label>
+      <div *ngIf="row.path" class="csv-path">{{ row.path }}</div>
+      <button class="btn btn-secondary btn-sm" (click)="openFileSelector(i)">
+        {{ row.path ? 'Change CSV' : 'Select CSV file' }}
+      </button>
+    </div>
+
+    <!-- Has Header -->
+    <div class="form-check mr-3 mb-2" style="flex: 0 0 auto;">
+      <input
+        type="checkbox"
+        class="form-check-input"
+        [checked]="row.hasHeader"
+        (change)="onRowHasHeaderToggle(i, $event)"
+        id="hasHeader{{ i }}"
+      />
+      <label class="form-check-label" for="hasHeader{{ i }}">Has header</label>
+    </div>
+
+    <!-- Preview CSV -->
+    <button
+      class="btn btn-secondary btn-sm mr-2 mb-2"
+      (click)="onPreviewCsvClick(i)"
+      [disabled]="!row.path"
+    >
+      Preview CSV
+    </button>
+
+    <!-- Remove Row -->
+    <button class="btn btn-outline-danger btn-sm mb-2" (click)="removeBinding(i)">
+      Remove
+    </button>
+  </div>
+
+  <!-- Add Table button -->
+  <button class="btn btn-secondary mb-4" (click)="addBinding()">Add Table</button>
+
+  <!-- ===== SQL Editor ===== -->
+  <div class="form-group mt-4"> <!-- mt-4 adds vertical spacing -->
+    <label class="form-label">SQL Query</label>
+    <textarea
+      class="form-control sql-editor"
+      rows="6"
+      [(ngModel)]="sqlQuery"
+      placeholder="Write your SQL query here..."
+    ></textarea>
+  </div>
+
+  <!-- Run SQL button -->
+  <button
+    class="btn btn-primary mb-3"
+    (click)="runQuery()"
+    [disabled]="isRunDisabled() || isSubmitting"
+  >
+    {{ isSubmitting ? 'Running…' : 'Run SQL' }}
+  </button>
+
+  <!-- CSV Preview Modal -->
+  <div *ngIf="showPreviewModal" class="modal-overlay" (click)="closePreviewModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h5>CSV Preview: {{ previewForPath }}</h5>
+      <table class="table table-bordered table-sm">
+        <thead>
+        <tr>
+          <th *ngFor="let col of previewData[0] | keyvalue; trackBy: trackByKey">
+            {{ col.key }}
+          </th>
+        </tr>
+        <tr>
+          <th *ngFor="let col of previewData[0] | keyvalue; trackBy: trackByKey" style="font-weight: normal;">
+            <select
+              [ngModel]="getColumnTypeForPreview(col.key, previewForPath || undefined)"
+              (ngModelChange)="onColumnTypeChange(col.key, $event)"
+              class="form-control form-control-sm"
+            >
+              <option value="string">string</option>
+              <option value="integer">integer</option>
+              <option value="long">long</option>
+              <option value="double">double</option>
+              <option value="boolean">boolean</option>
+              <option value="timestamp">timestamp</option>
+              <option value="binary">binary</option>
+            </select>
+          </th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let row of previewData">
+          <td *ngFor="let col of previewData[0] | keyvalue; trackBy: trackByKey">
+            {{ row[col.key] }}
+          </td>
+        </tr>
+        </tbody>
+      </table>
+      <button class="btn btn-secondary mt-3" (click)="closePreviewModal()">Close</button>
+    </div>
+  </div>
+</div>
