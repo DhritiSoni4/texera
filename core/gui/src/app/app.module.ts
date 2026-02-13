@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
+import { CommonModule } from '@angular/common';
+import { UserSqlComponent } from './workspace/component/sql-to-workflow/user-sql/user-sql.component';
 import { DatePipe, registerLocaleData } from "@angular/common";
 import { HTTP_INTERCEPTORS, HttpClientModule } from "@angular/common/http";
 import en from "@angular/common/locales/en";
@@ -175,6 +176,7 @@ registerLocaleData(en);
 
 @NgModule({
   declarations: [
+    UserSqlComponent,
     AdminGmailComponent,
     PublicProjectComponent,
     AppComponent,
@@ -263,6 +265,7 @@ registerLocaleData(en);
     AdminSettingsComponent,
   ],
   imports: [
+    CommonModule,
     BrowserModule,
     AppRoutingModule,
     HttpClientModule,

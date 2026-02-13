@@ -156,6 +156,14 @@
             nz-icon
             nzType="download"></i>
         </button>
+        <button
+          nz-button
+          nzType="default"
+          (click)="onClickOpenSQLWorkflow()"
+          nz-tooltip="Open SQL Workflow Panel">
+          <i nz-icon nzType="code" nzTheme="outline"></i>
+        </button>
+
       </nz-button-group>
       <ng-template #utilities>
         <nz-button-group>
@@ -424,3 +432,24 @@
     </div>
   </div>
 </div>
+<!-- SQL Workflow Modal Form -->
+<!--<nz-modal-->
+<!--  [(nzVisible)]="isSqlModalVisible"-->
+<!--  nzTitle="Import SQL Workflow"-->
+<!--  (nzOnCancel)="isSqlModalVisible = false"-->
+<!--  (nzOnOk)="onSQLSubmit()"-->
+<!--  [nzOkDisabled]="sqlFormGroup.invalid"-->
+<!--  [nzFooter]="null"-->
+<!--&gt;-->
+<!--  <form [formGroup]="sqlFormGroup" (ngSubmit)="onSQLSubmit()">-->
+<!--    <label for="filePath">SQL File Path</label>-->
+<!--    <input id="filePath" type="text" formControlName="filePath" class="ant-input" />-->
+
+<!--    <label for="sqlQuery">SQL Query</label>-->
+<!--    <textarea id="sqlQuery" rows="4" formControlName="sqlQuery" class="ant-input"></textarea>-->
+
+<!--    <button nz-button nzType="primary" htmlType="submit" [disabled]="sqlFormGroup.invalid">-->
+<!--      Run & Import Workflow-->
+<!--    </button>-->
+<!--  </form>-->
+<!--</nz-modal>-->

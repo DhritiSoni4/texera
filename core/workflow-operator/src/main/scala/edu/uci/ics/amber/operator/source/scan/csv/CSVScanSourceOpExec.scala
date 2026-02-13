@@ -106,3 +106,4 @@ class CSVScanSourceOpExec private[csv] (descString: String) extends SourceOperat
     }
   }
 }
+

@@ -18,7 +18,7 @@
  */
 
 import { Injectable } from "@angular/core";
-import { HttpClient, HttpParams, HttpResponse } from "@angular/common/http";
+import { HttpClient, HttpParams, HttpResponse, HttpHeaders } from "@angular/common/http";
 import { catchError, map, mergeMap, switchMap, tap, toArray } from "rxjs/operators";
 import { Dataset, DatasetVersion } from "../../../../common/type/dataset";
 import { AppSettings } from "../../../../common/app-setting";
@@ -27,6 +27,7 @@ import { DashboardDataset } from "../../../type/dashboard-dataset.interface";
 import { DatasetFileNode } from "../../../../common/type/datasetVersionFileTree";
 import { DatasetStagedObject } from "../../../../common/type/dataset-staged-object";
 import { GuiConfigService } from "../../../../common/service/gui-config.service";
+
 
 export const DATASET_BASE_URL = "dataset";
 export const DATASET_CREATE_URL = DATASET_BASE_URL + "/create";
@@ -53,6 +54,7 @@ export interface MultipartUploadProgress {
   uploadId: string;
   physicalAddress: string;
 }
+
 
 @Injectable({
   providedIn: "root",
@@ -311,7 +313,13 @@ export class DatasetService {
 
     return this.http.delete<Response>(`${AppSettings.getApiEndpoint()}/${DATASET_BASE_URL}/${did}/file`, { params });
   }
-
+  // public getSqlResults(
+  //   payload: { sql: string; bindings: { [key: string]: { path: string; hasHeader: boolean; columnTypes: Record<string, string>; }; } }
+  // ): Observable<SqlResultResponse> {
+  //   const headers = new HttpHeaders({ "Content-Type": "application/json" });
+  //   // IMPORTANT: Replace with the correct backend API endpoint if it's different
+  //   return this.http.post<SqlResultResponse>("http://localhost:8080/api/sql/execute", payload, { headers });
+  // }
   /**
    * Retrieves the list of uncommitted dataset changes (diffs).
    * @param did Dataset ID
@@ -331,6 +339,27 @@ export class DatasetService {
       : `${AppSettings.getApiEndpoint()}/${DATASET_BASE_URL}/${did}/${DATASET_PUBLIC_VERSION_RETRIEVE_LIST_URL}`;
     return this.http.get<DatasetVersion[]>(apiEndPont);
   }
+
+  public convertSqlToWorkflow(
+    body: { sql: string; bindings?: Record<string, { path: string; hasHeader?: boolean; columnTypes?: Record<string, string>; inferredTypes?: Record<string, string>; customDelimiter?: string; fileEncoding?: string }> }
+  ): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    // Relative path; Angular proxy (proxy.conf.json) will forward to Spring Boot backend on port 8083
+    return this.http.post<any>('/api/sql/convert', body, { headers });
+  }
+
+
+
+
+  // public getSqlResults(
+  //   payload: { sql: string; bindings: { [key: string]: { path: string; hasHeader: boolean; columnTypes: Record<string, string>; }; } }
+  // ): Observable<SqlResultResponse> {
+  //   const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+  //   // IMPORTANT: Replace with the correct backend API endpoint
+  //   return this.http.post<SqlResultResponse>('http://localhost:8080/api/sql/execute', payload, { headers });
+  // }
+
+
 
   /**
    * retrieve the latest version of a dataset.
@@ -400,3 +429,5 @@ export class DatasetService {
     return this.http.get<string[]>(`${AppSettings.getApiEndpoint()}/${DATASET_GET_OWNERS_URL}`);
   }
 }
+
+

@@ -27,6 +27,7 @@ import { OperatorMetadataService } from "../service/operator-metadata/operator-m
 import { UndoRedoService } from "../service/undo-redo/undo-redo.service";
 import { WorkflowCacheService } from "../service/workflow-cache/workflow-cache.service";
 import { WorkflowActionService } from "../service/workflow-graph/model/workflow-action.service";
+import { WorkflowUtilService } from "../service/workflow-graph/util/workflow-util.service";
 import { NzMessageService } from "ng-zorro-antd/message";
 import { debounceTime, distinctUntilChanged, filter, switchMap, throttleTime } from "rxjs/operators";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -61,25 +62,19 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
   public isLoading: boolean = false;
   @ViewChild("codeEditor", { read: ViewContainerRef }) codeEditorViewRef!: ViewContainerRef;
 
-  /**
-   * Flag to ensure auto persist is registered only once.  This prevents multiple
-   * subscriptions and avoids accidental persistence of an empty workflow
-   * before the actual workflow is loaded from backend.
-   */
   private autoPersistRegistered = false;
 
   constructor(
     private userService: UserService,
-    // list additional 3 services in constructor so they are initialized even if no one use them directly
-    // TODO: make their lifecycle better
+    // additional services for lifecycle
     private workflowCompilingService: WorkflowCompilingService,
     private workflowConsoleService: WorkflowConsoleService,
     private operatorReuseCacheStatusService: OperatorReuseCacheStatusService,
-    // end of additional services
     private undoRedoService: UndoRedoService,
     private workflowCacheService: WorkflowCacheService,
     private workflowPersistService: WorkflowPersistService,
     private workflowActionService: WorkflowActionService,
+    private workflowUtilService: WorkflowUtilService,  // Injected here
     private location: Location,
     private route: ActivatedRoute,
     private operatorMetadataService: OperatorMetadataService,
@@ -92,54 +87,32 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    /**
-     * On initialization of the workspace, there are two possibilities regarding which component has
-     * routed to this component:
-     *
-     * 1. Routed to this component from within UserProjectSection component
-     *    - track the pid identifying that project
-     *    - upon persisting of a workflow, must also ensure it is also added to the project
-     *
-     * 2. Routed to this component from SavedWorkflowSection component
-     *    - there is no related project, parseInt will return NaN.
-     *    - NaN || undefined will result in undefined.
-     */
     this.pid = parseInt(this.route.snapshot.queryParams.pid) || undefined;
     this.workflowActionService.setHighlightingEnabled(true);
+
+    const navState = window.history.state;
+    if (navState && navState.workflow) {
+      try {
+        // Cast to any to avoid TS errors on .clear()
+        (this.workflowActionService.getJointGraph() as any).clear();
+        (this.workflowActionService.getTexeraGraph() as any).clear();
+        this.workflowActionService.reloadWorkflow(navState.workflow);
+        console.log("Workflow loaded from navigation state!");
+      } catch (error) {
+        console.error("Failed to load workflow from navigation state:", error);
+      }
+    }
   }
 
   ngAfterViewInit(): void {
-    /**
-     * On initialization of the workspace, there could be three cases:
-     *
-     * - with userSystem enabled, usually during prod mode:
-     * 1. Accessed by URL `/`, no workflow is in the URL (Cold Start):
-     -    - A new `WorkflowActionService.DEFAULT_WORKFLOW` is created, which is an empty workflow with undefined id.
-     *    - After an Auto-persist being triggered by a WorkflowAction event, it will create a new workflow in the database
-     *    and update the URL with its new ID from database.
-     * 2. Accessed by URL `/workflow/:id` (refresh manually, or redirected from dashboard workflow list):
-     *    - It will retrieve the workflow from database with the given ID. Because it has an ID, it will be linked to the database
-     *    - Auto-persist will be triggered upon all workspace events.
-     *
-     * - with userSystem disabled, during dev mode:
-     * 1. Accessed by URL `/`, with a workflow cached (refresh manually):
-     *    - This will trigger the WorkflowCacheService to load the workflow from cache.
-     *    - Auto-cache will be triggered upon all workspace events.
-     *
-     * WorkflowActionService is the single source of the workflow representation. Both WorkflowCacheService and WorkflowPersistService are
-     * reflecting changes from WorkflowActionService.
-     */
-    // clear the current workspace, reset as `WorkflowActionService.DEFAULT_WORKFLOW`
     this.workflowActionService.resetAsNewWorkflow();
 
     if (this.config.env.userSystemEnabled) {
-      // if a workflow id is present in the route, display loading spinner immediately while loading
       const widInRoute = this.route.snapshot.params.id;
       if (widInRoute) {
         this.isLoading = true;
         this.workflowActionService.disableWorkflowModification();
       }
-
       this.onWIDChange();
       this.updateViewCount();
     }
@@ -156,7 +129,14 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
     }
 
     this.codeEditorViewRef.clear();
-    this.workflowActionService.clearWorkflow();
+
+    // If your WorkflowActionService does NOT have clearWorkflow(),
+    // replace with resetAsNewWorkflow(), else keep as is.
+    if (typeof this.workflowActionService.clearWorkflow === "function") {
+      this.workflowActionService.clearWorkflow();
+    } else {
+      this.workflowActionService.resetAsNewWorkflow();
+    }
   }
 
   registerAutoCacheWorkFlow(): void {
@@ -170,7 +150,6 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
   }
 
   registerAutoPersistWorkflow(): void {
-    // make sure it is only registered once
     if (this.autoPersistRegistered) {
       return;
     }
@@ -191,13 +170,11 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
               }
               this.workflowActionService.setWorkflowMetadata(updatedWorkflow);
             });
-          // to sync up with the updated information, such as workflow.wid
         }
       });
   }
 
   loadWorkflowWithId(wid: number): void {
-    // disable the workspace until the workflow is fetched from the backend
     this.isLoading = true;
     this.workflowActionService.disableWorkflowModification();
     this.workflowPersistService
@@ -206,30 +183,22 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
       .subscribe(
         (workflow: Workflow) => {
           this.workflowActionService.setNewSharedModel(wid, this.userService.getCurrentUser());
-          // remember URL fragment
           const fragment = this.route.snapshot.fragment;
-          // load the fetched workflow
           this.workflowActionService.reloadWorkflow(workflow);
           this.workflowActionService.enableWorkflowModification();
-          // set the URL fragment to previous value
-          // because reloadWorkflow will highlight/unhighlight all elements
-          // which will change the URL fragment
           this.router.navigate([], {
             relativeTo: this.route,
             fragment: fragment !== null ? fragment : undefined,
             preserveFragment: false,
           });
-          // highlight the operator, comment box, or link in the URL fragment
           if (fragment) {
             if (this.workflowActionService.getTexeraGraph().hasElementWithID(fragment)) {
               this.workflowActionService.highlightElements(false, fragment);
             } else {
               this.notificationService.error(`Element ${fragment} doesn't exist`);
-              // remove the fragment from the URL
               this.router.navigate([], { relativeTo: this.route });
             }
           }
-          // clear stack
           this.undoRedoService.clearUndoStack();
           this.undoRedoService.clearRedoStack();
           this.isLoading = false;
@@ -238,9 +207,7 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
         },
         () => {
           this.workflowActionService.resetAsNewWorkflow();
-          // enable workspace for modification
           this.workflowActionService.enableWorkflowModification();
-          // clear stack
           this.undoRedoService.clearUndoStack();
           this.undoRedoService.clearRedoStack();
           this.message.error("You don't have access to this workflow, please log in with an appropriate account");
@@ -256,13 +223,9 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
       .subscribe(() => {
         let wid = this.route.snapshot.params.id;
         if (this.config.env.userSystemEnabled) {
-          // load workflow with wid if presented in the URL
           if (wid) {
-            // show loading spinner right away while waiting for workflow to load
             this.isLoading = true;
-            // temporarily disable modification to prevent editing an empty workflow before real data is loaded
             this.workflowActionService.disableWorkflowModification();
-            // if wid is present in the url, load it from the backend once the user info is ready
             this.userService
               .userChanged()
               .pipe(untilDestroyed(this))
@@ -270,37 +233,26 @@ export class WorkspaceComponent implements AfterViewInit, OnInit, OnDestroy {
                 this.loadWorkflowWithId(wid);
               });
           } else {
-            // no workflow to load; directly register auto persist for brand-new workflow
             this.registerAutoPersistWorkflow();
           }
         } else {
-          // remember URL fragment
           const fragment = this.route.snapshot.fragment;
-          // fetch the cached workflow first
           const cachedWorkflow = this.workflowCacheService.getCachedWorkflow();
-          // responsible for saving the existing workflow in cache
           this.registerAutoCacheWorkFlow();
-          // load the cached workflow
           this.workflowActionService.reloadWorkflow(cachedWorkflow);
-          // set the URL fragment to previous value
-          // because reloadWorkflow will highlight/unhighlight all elements
-          // which will change the URL fragment
           this.router.navigate([], {
             relativeTo: this.route,
             fragment: fragment !== null ? fragment : undefined,
             preserveFragment: false,
           });
-          // highlight the operator, comment box, or link in the URL fragment
           if (fragment) {
             if (this.workflowActionService.getTexeraGraph().hasElementWithID(fragment)) {
               this.workflowActionService.highlightElements(false, fragment);
             } else {
               this.notificationService.error(`Element ${fragment} doesn't exist`);
-              // remove the fragment from the URL
               this.router.navigate([], { relativeTo: this.route });
             }
           }
-          // clear stack
           this.undoRedoService.clearUndoStack();
           this.undoRedoService.clearRedoStack();
         }

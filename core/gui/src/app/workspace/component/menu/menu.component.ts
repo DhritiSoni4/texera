@@ -54,6 +54,11 @@ import { ComputingUnitStatusService } from "../../service/computing-unit-status/
 import { ComputingUnitState } from "../../types/computing-unit-connection.interface";
 import { ComputingUnitSelectionComponent } from "../power-button/computing-unit-selection.component";
 import { GuiConfigService } from "../../../common/service/gui-config.service";
+import { FormGroup, FormBuilder , Validators} from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+
+import { UserSqlComponent } from "../sql-to-workflow/user-sql/user-sql.component";
+
 
 /**
  * MenuComponent is the top level menu bar that shows
@@ -77,6 +82,7 @@ import { GuiConfigService } from "../../../common/service/gui-config.service";
   styleUrls: ["menu.component.scss"],
 })
 export class MenuComponent implements OnInit, OnDestroy {
+  public sqlFormGroup!: FormGroup;
   public executionState: ExecutionState; // set this to true when the workflow is started
   public ExecutionState = ExecutionState; // make Angular HTML access enum definition
   public ComputingUnitState = ComputingUnitState; // make Angular HTML access enum definition
@@ -135,7 +141,9 @@ export class MenuComponent implements OnInit, OnDestroy {
     private reportGenerationService: ReportGenerationService,
     private panelService: PanelService,
     private computingUnitStatusService: ComputingUnitStatusService,
-    protected config: GuiConfigService
+    protected config: GuiConfigService,
+    private fb: FormBuilder,
+    private http: HttpClient
   ) {
     workflowWebsocketService
       .subscribeToEvent("ExecutionDurationUpdateEvent")
@@ -554,6 +562,59 @@ export class MenuComponent implements OnInit, OnDestroy {
     const fileName = this.currentWorkflowName + ".json";
     saveAs(new Blob([workflowContentJson], { type: "text/plain;charset=utf-8" }), fileName);
   }
+  public onClickOpenSQLWorkflow(): void {
+    this.modalService.create({
+      nzTitle: "SQL to Workflow",
+      nzContent: UserSqlComponent,
+      nzFooter: null,
+      nzWidth: "700px",
+    });
+    // //const sqlQuery = this.sqlFormGroup.get("sqlQuery")?.value;
+    // //const csvPath = this.sqlFormGroup.get("csvPath")?.value;
+    // // this.isSqlModalVisible = true;
+    //
+    // // if (!sqlQuery || !csvPath) {
+    // //   this.notificationService.error("Please enter both SQL query and CSV path.");
+    // //   return;
+    // // }
+    //
+    // const payload = {
+    //   sql: sqlQuery,
+    //   csv_path: csvPath
+    // };
+    //
+    // this.http.post<any>("http://localhost:5001/convert", payload).subscribe({
+    //   next: (response) => {
+    //     const workflowContent = response.workflow;
+    //     if (!workflowContent) {
+    //       this.notificationService.error("No workflow returned from conversion service.");
+    //       return;
+    //     }
+    //
+    //     const workflow: Workflow = {
+    //       content: workflowContent,
+    //       name: "Imported SQL Workflow",
+    //       description: undefined,
+    //       wid: undefined,
+    //       creationTime: undefined,
+    //       lastModifiedTime: undefined,
+    //       readonly: false,
+    //       isPublished: 0,
+    //     };
+    //
+    //     this.workflowActionService.enableWorkflowModification();
+    //     this.workflowActionService.reloadWorkflow(workflow, true);
+    //     this.undoRedoService.clearUndoStack();
+    //     this.undoRedoService.clearRedoStack();
+    //   },
+    //   error: (err) => {
+    //     console.error("API error:", err);
+    //     this.notificationService.error("Failed to convert SQL to workflow.");
+    //   }
+    // });
+  }
+
+
 
   /**
    * Returns true if there's any operator on the graph; false otherwise

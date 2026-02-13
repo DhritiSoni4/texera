@@ -49,11 +49,17 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
 
   fileTypeName = Option("CSV")
 
+  @JsonProperty
+  var columnTypes: Map[String, String] = Map.empty
+
+  @JsonProperty
+  var inferredTypes: Map[String, String] = Map.empty
+
   @throws[IOException]
   override def getPhysicalOp(
-      workflowId: WorkflowIdentity,
-      executionId: ExecutionIdentity
-  ): PhysicalOp = {
+                              workflowId: WorkflowIdentity,
+                              executionId: ExecutionIdentity
+                            ): PhysicalOp = {
     // fill in default values
     if (customDelimiter.isEmpty || customDelimiter.get.isEmpty) {
       customDelimiter = Option(",")
@@ -77,32 +83,31 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
   }
 
   override def sourceSchema(): Schema = {
-    if (customDelimiter.isEmpty || !fileResolved()) {
-      return null
-    }
+    if (customDelimiter.isEmpty || !fileResolved()) return null
+
     val stream = DocumentFactory.openReadonlyDocument(new URI(fileName.get)).asInputStream()
-    val inputReader =
-      new InputStreamReader(stream, fileEncoding.getCharset)
+    val inputReader = new InputStreamReader(stream, fileEncoding.getCharset)
 
     val csvFormat = new CsvFormat()
     csvFormat.setDelimiter(customDelimiter.get.charAt(0))
     csvFormat.setLineSeparator("\n")
+
     val csvSetting = new CsvParserSettings()
     csvSetting.setMaxCharsPerColumn(-1)
     csvSetting.setFormat(csvFormat)
     csvSetting.setHeaderExtractionEnabled(hasHeader)
     csvSetting.setNullValue("")
+
     val parser = new CsvParser(csvSetting)
     parser.beginParsing(inputReader)
 
     var data: Array[Array[String]] = Array()
     val readLimit = limit.getOrElse(INFER_READ_LIMIT).min(INFER_READ_LIMIT)
-    for (i <- 0 until readLimit) {
+    for (_ <- 0 until readLimit) {
       val row = parser.parseNext()
-      if (row != null) {
-        data = data :+ row
-      }
+      if (row != null) data = data :+ row
     }
+
     parser.stopParsing()
     inputReader.close()
 
@@ -113,13 +118,45 @@ class CSVScanSourceOpDesc extends ScanSourceOpDesc {
     val header: Array[String] =
       if (hasHeader)
         Option(parser.getContext.headers())
-          .getOrElse((1 to attributeTypeList.length).map(i => "column-" + i).toArray)
-      else (1 to attributeTypeList.length).map(i => "column-" + i).toArray
+          .getOrElse((1 to attributeTypeList.length).map(i => s"column-$i").toArray)
+      else
+        (1 to attributeTypeList.length).map(i => s"column-$i").toArray
 
-    header.indices.foldLeft(Schema()) { (schema, i) =>
-      schema.add(header(i), attributeTypeList(i))
+    // Build schema using hybrid typing (persisted > inferred > auto-inferred)
+    var schema = Schema()
+    header.indices.foreach { i =>
+      val colName = header(i)
+
+      val typeName: String =
+        columnTypes.getOrElse(colName,
+          inferredTypes.getOrElse(colName,
+            attributeTypeList(i).toString.toLowerCase
+          )
+        )
+
+      val attrType = typeName.toLowerCase match {
+        case "string"    => AttributeType.STRING
+        case "integer"   => AttributeType.INTEGER
+        case "double"    => AttributeType.DOUBLE
+        case "boolean"   => AttributeType.BOOLEAN
+        case "timestamp" => AttributeType.TIMESTAMP
+        case _           => AttributeType.STRING
+      }
+
+      // Immutable Schema: create a new schema by appending a new Attribute
+      schema = schema.copy(attributes = schema.getAttributes :+ new edu.uci.ics.amber.core.tuple.Attribute(colName, attrType))
     }
 
+    schema
   }
 
+
+
+
+
+
+
+
+
 }
+

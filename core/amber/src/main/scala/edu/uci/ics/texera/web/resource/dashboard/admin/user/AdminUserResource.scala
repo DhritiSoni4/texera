@@ -62,7 +62,9 @@ class AdminUserResource {
   def updateUser(user: User): Unit = {
     val existingUser = userDao.fetchOneByEmail(user.getEmail)
     if (existingUser != null && existingUser.getUid != user.getUid) {
-      throw new WebApplicationException("Email already exists", Response.Status.CONFLICT)
+      throw new WebApplicationException(
+        Response.status(Response.Status.CONFLICT).entity("Email already exists").build()
+      )
     }
     val updatedUser = userDao.fetchOneByUid(user.getUid)
     val roleChanged = updatedUser.getRole != user.getRole
@@ -72,11 +74,17 @@ class AdminUserResource {
     updatedUser.setComment(user.getComment)
     userDao.update(updatedUser)
 
-    if (roleChanged)
-      sendEmail(
+    println(s"[DEBUG] Role changed: $roleChanged for user ${user.getEmail}")
+
+    if (roleChanged) {
+      val result = sendEmail(
         createRoleChangeTemplate(receiverEmail = updatedUser.getEmail, newRole = user.getRole),
         updatedUser.getEmail
       )
+
+      result.left.foreach(error => println(s"[ERROR] Failed to send role update email: $error"))
+    }
+
   }
 
   @POST

@@ -81,6 +81,55 @@ lazy val WorkflowExecutionService = (project in file("amber"))
   .configs(Test)
   .dependsOn(DAO % "test->test", Auth % "test->test") // test scope dependency
 
+lazy val SqlService = (project in file("sql-service"))
+  .settings(
+    name := "sql-service",
+    version := "1.0.0",
+    scalaVersion := "2.13.12",
+
+    // Specify the main class
+    Compile / mainClass := Some("edu.uci.ics.texera.sqlservice.CalciteApplication"),
+
+    // Java 11 target
+    javacOptions ++= Seq("--release", "11", "-encoding", "UTF-8"),
+    scalacOptions ++= Seq("-target:jvm-11"),
+
+    // Dependencies
+    libraryDependencies ++= Seq(
+      // Dropwizard 2.x (Java 11 compatible)
+      "io.dropwizard" % "dropwizard-core" % "2.1.1",
+      "io.dropwizard" % "dropwizard-configuration" % "2.1.1",
+
+      // Apache Calcite
+      "org.apache.calcite" % "calcite-core" % "1.38.0",
+
+      // JSON / Jackson
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.16.1",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.16.1",
+
+      // JAX-RS API (needed for Dropwizard)
+      "javax.ws.rs" % "javax.ws.rs-api" % "2.1.1",
+
+      // Logging (ensure compatible version)
+      "ch.qos.logback" % "logback-classic" % "1.2.11",
+      "ch.qos.logback" % "logback-core" % "1.2.11"
+    ),
+
+    // Override dependencies to avoid conflicts
+    dependencyOverrides ++= Seq(
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.16.1",
+      "com.fasterxml.jackson.core" % "jackson-core" % "2.16.1",
+      "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.16.1",
+      "ch.qos.logback" % "logback-classic" % "1.2.11",
+      "ch.qos.logback" % "logback-core" % "1.2.11"
+    )
+  )
+  .dependsOn(Config) // SqlService depends on Config project
+
+
+
+
+
 // root project definition
 lazy val CoreProject = (project in file("."))
   .aggregate(
@@ -93,7 +142,8 @@ lazy val CoreProject = (project in file("."))
     FileService,
     WorkflowOperator,
     WorkflowCompilingService,
-    WorkflowExecutionService
+    WorkflowExecutionService,
+    SqlService
   )
   .settings(
     name := "core",

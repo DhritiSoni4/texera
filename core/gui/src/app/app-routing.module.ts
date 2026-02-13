@@ -18,6 +18,8 @@
  */
 
 import { NgModule } from "@angular/core";
+import { UserSqlComponent } from "./workspace/component/sql-to-workflow/user-sql/user-sql.component";
+
 import { RouterModule, Routes } from "@angular/router";
 import { DashboardComponent } from "./dashboard/component/dashboard.component";
 import { UserWorkflowComponent } from "./dashboard/component/user/user-workflow/user-workflow.component";
@@ -143,6 +145,11 @@ routes.push({
           path: "discussion",
           component: FlarumComponent,
         },
+        {
+          path: "sql",
+          component: UserSqlComponent,
+        },
+
       ],
     },
     {
