@@ -170,6 +170,8 @@ lazy val WorkflowExecutionService = (project in file("amber"))
   .configs(Test)
   .dependsOn(DAO % "test->test", Auth % "test->test") // test scope dependency
 
+lazy val SqlService = (project in file("sql-to-workflow-service"))
+  .dependsOn(WorkflowCore, Auth, Config, DAO)
 // root project definition
 lazy val TexeraProject = (project in file("."))
   .aggregate(
@@ -186,7 +188,8 @@ lazy val TexeraProject = (project in file("."))
     ConfigService,
     FileService,
     WorkflowCompilingService,
-    WorkflowExecutionService
+    WorkflowExecutionService,
+    SqlService
   )
   .settings(
     name := "texera",
