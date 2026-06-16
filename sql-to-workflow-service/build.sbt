@@ -3,7 +3,7 @@ name := "sql-to-workflow-service"
 version := "1.0.0"
 
 scalaVersion := "2.13.18"
-
+Compile / javacOptions --= Seq("-Werror")
 // Dropwizard + Calcite SQL service
 libraryDependencies ++= Seq(
   "io.dropwizard" % "dropwizard-core" % "2.1.1",
